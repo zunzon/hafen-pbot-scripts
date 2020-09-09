@@ -1,0 +1,111 @@
+//Collects dreams from dreamcatchers over selected area
+
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotAPI = Java.type('haven.purus.pbot.PBotAPI');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+
+const WINDOWNAME = "DreamHarvester";
+const HOWTO = "Select area with both dreamcatchers and containers";
+const messageLevel = 1;
+
+const mWindow = PBotUtils.PBotWindow(WINDOWNAME, 24, 140, ScriptID);
+const StartBtn = mWindow.addButton("Start", "Start", 80, 24, 0);
+const HelpBtn = mWindow.addButton("Help", "Help", 24, 104, 0);
+const Label = mWindow.addLabel("", 24, 8);
+
+Label.hide();
+const Start = () => {
+	StartBtn.hide();
+	HelpBtn.hide();
+	Label.show();
+	stopmsg = [];
+	try {
+		if ( main() )
+			info("Done", 0);
+	} catch (e) {
+		info("ERROR: " + e, 1);
+		mWindow.closeWindow();
+	}
+	StartBtn.show();
+	HelpBtn.show();
+	Label.hide();
+}
+const Help = () => {
+	info(HOWTO, 0);
+}
+
+//start
+function main() {
+  var aCatcher = [];
+  var aContainer = [];
+	Label.setText("Select zone with dreamcatchers and containers");
+  PBotUtils.selectArea();
+  let ListAllGobs = PBotUtils.gobsInArea(PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+  for (let g of ListAllGobs) {
+    if (isCatcher(g))
+      aCatcher.push(g);
+    if (isContainer(g))
+      aContainer.push(g);
+  }
+	while (PBotUtils.getItemAtHand() == null) {
+	  for (let dreca of aCatcher) {
+       collectDreams(dreca);
+  	}
+	}
+	info("Inventory full, exiting");
+}
+
+function collectDreams(d) {
+  PBotUtils.pfRightClick(d, 0);
+	PBotUtils.sleep(1000);
+	PBotUtils.choosePetal("Harvest");
+	PBotUtils.sleep(1000);
+}
+
+
+function pickPetal(s) {
+	let r = false;
+	PBotUtils.waitForFlowerMenu();
+	r = PBotUtils.choosePetal(s);
+	PBotUtils.closeFlowermenu();
+	if (!r) info("Unable to " + s);
+	return r;
+}
+
+function isContainer(a) {
+	let res = false;
+	try {
+		if (a.getResname() != "gfx/terobjs/stonecasket")
+			return false;
+		res = (getSDT(a.gob) < 30);
+	} catch(e) {info("isContainer: " + e)};
+	return res;
+}
+
+function isCatcher(a) {
+  let res = false;
+  try {
+    if (a.getResname() != "gfx/terobjs/dreca")
+      return false;
+    res = (getSDT(a.gob) < 30);
+  } catch(e) {info("isCatcher: " + e)};
+  return res;
+}
+
+function getSDT(g) {
+	const hcResDrawable = Java.type("haven.ResDrawable");
+	let r = null;
+	try {
+		r = g.getattr(hcResDrawable).sdt.peekrbuf(0);
+	} catch (e) {
+		info("getSDT(" + g + ") error: " + e);
+	}
+	return r;
+}
+
+function info(s, l) {
+	if (l <= messageLevel)
+		PBotUtils.sysMsg(s + "", 128, 192, 200);
+}

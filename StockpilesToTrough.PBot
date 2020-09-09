@@ -1,0 +1,76 @@
+//Stores stockpiles to trough
+
+// Select a zone with stockpiled animal foods
+// Select trough to fill
+// Click start
+
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotAPI = Java.type('haven.purus.pbot.PBotAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const window = PBotUtils.PBotWindow("Trough Filler", 105, 200, ScriptID);
+const foodItems = ['Carrot', 'Beetroot', 'Beetroot Leaves', 'Turnip'];
+const foodStockpiles = [];
+let troughGob = 0;
+
+window.addButton("foodBtn", "Add food stockpiles", 180, 10, 10);
+window.addButton("troughBtn", "Select trough", 180, 10, 40);
+window.addButton("startBtn", "Start", 180, 10, 70);
+
+const troughBtn = () => {
+	PBotUtils.sysMsg("Please alt+click a food trough!");
+	const selectedGob = PBotGobAPI.selectGob();
+	if(selectedGob.getResname() === 'gfx/terobjs/trough') {
+		PBotUtils.sysMsg("Trough selected!");
+		troughGob = selectedGob;
+	} else {
+		PBotUtils.sysMsg("Silly you, that's not a trough!");
+	}
+};
+
+const foodBtn = () => {
+	PBotUtils.selectArea();
+	const gobs = PBotUtils.gobsInArea(PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+	for(let i=0; i<gobs.size(); i++) {
+			foodStockpiles.push(gobs[i]);
+	}
+	PBotUtils.sysMsg("Food stockpiles currently chosen: " + foodStockpiles.length);
+};
+
+const startBtn = () => {
+	PBotUtils.sysMsg("Starting food trough filler bot...");
+  if(!troughGob) {
+    PBotUtils.sysMsg("Select food trough first");
+    return;
+  }
+	let stop = false;
+	while(!stop) {
+	  const playerInv = PBotUtils.playerInventory();
+	  if(foodStockpiles.length === 0) {
+	  	PBotUtils.sysMsg("No food stockpiles!");
+	  	break;
+  	}
+		PBotUtils.pfRightClick(foodStockpiles[0], 0);
+		PBotUtils.sleep(1000);
+		PBotWindowAPI.waitForWindow("Stockpile", 2000);
+		const slots = PBotUtils.playerInventory().freeSlotsInv();
+		const food = PBotWindowAPI.getStockpileUsedCapacity();
+		if(food <= slots)
+			foodStockpiles.shift();
+		PBotWindowAPI.takeItemsFromStockpile(Math.min(slots, food));
+		PBotUtils.sleep(1000);
+		let foods = PBotUtils.playerInventory().getInventoryItemsByNames(foodItems);
+
+		PBotUtils.pfRightClick(troughGob, 0);
+		PBotWindowAPI.waitForWindow("Trough", 2000);
+		PBotUtils.sleep(2000);
+		const amount = PBotWindowAPI.getAmounts(PBotWindowAPI.getWindow("Trough"));
+    PBotUtils.sysMsg("Trough is " + amount + " % full");
+		for (let i=0; i<foods.length; i++) {
+      foods[i].takeItem(true);
+		  troughGob.itemClickAll();
+			PBotUtils.sleep(3000);
+			foods = PBotUtils.playerInventory().getInventoryItemsByNames(foodItems);
+		}
+	}
+}
