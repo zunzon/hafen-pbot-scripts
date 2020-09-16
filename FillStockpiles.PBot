@@ -1,0 +1,107 @@
+// Fill stockpiles with items from ground
+// Very useful of harvesting crops from fields
+
+// Click start
+// Select item in inventory, which will be stockpiled
+// Select item on ground, which will be stockpiled
+// Select zone with stockpiles of item you will stockpile
+
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotAPI = Java.type('haven.purus.pbot.PBotAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const window = PBotUtils.PBotWindow("Stockpile filler", 40, 200, ScriptID);
+const harvestItemsInventory = [];
+const harvestItemsGround = [];
+const workStockpiles = [];
+
+window.addButton("startBtn", "Start", 180, 10, 10);
+
+let stop = false;
+function pickSimilar(
+  g /*PBotGob*/
+) {
+    const hcOCache = Java.type('haven.OCache');
+    const hcCoord = Java.type('haven.Coord');
+    const posres = hcOCache.posres;
+    PBotAPI.gui.map.wdgmsg("click", hcCoord.z, g.gob.rc.floor(posres), 3, 1, 0, g.gob.id, g.gob.rc.floor(posres), 0, -1);
+    let w = waitMove(false, 20 * 1000);
+}
+
+function waitMove(
+b, /*is moving*/
+t  /*timeout*/
+) {
+    const TICK = 100;
+    const maxchecks = b ? 2 : 4;
+    let checks = maxchecks;
+    const pls = () => PBotGobAPI.player().gob.rc.abs() * PBotGobAPI.player().gob.a;
+    let prev = pls();
+    let TO = t;
+    for ( ; TO > 0; TO -= TICK ) {
+        let prev = pls();
+        PBotUtils.sleep(TICK);
+        if ( checks <= 0 || shouldStop() )
+            break;
+        if ( (pls() != prev) == b)
+            checks--;
+        else
+            checks = maxchecks;
+    }
+    return (TO > 0);
+}
+
+shouldStop = () => {
+	return stop;
+}
+
+const startBtn = () => {
+
+  //Selecting item in inventory to work with
+  PBotUtils.sysMsg("Click on item for harvest in inventory");
+  const harvestItemsInventory = PBotUtils.selectItem();
+  PBotUtils.sysMsg("Selected: " + harvestItemsInventory.getResname());
+
+  //Selecting item gob on ground to work with
+  PBotUtils.sysMsg("Alt+click on item on lying on ground");
+  const harvestItemsGround = PBotGobAPI.selectGob().getResname();
+  PBotUtils.sysMsg("Selected (no check)");
+
+  //Selecting stockpiles to work with
+  PBotUtils.selectArea();
+  const gobs = PBotUtils.gobsInArea(PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+  for(let i=0; i<gobs.size(); i++) {
+      workStockpiles.push(gobs[i]);
+  }
+  PBotUtils.sysMsg("Work stockpiles: " + workStockpiles.length);
+
+  //Collect from ground
+  while(!stop) {
+    const gob = PBotGobAPI.findGobByNames(1000, [harvestItemsGround]);
+    if(gob === null) {
+      PBotUtils.sysMsg("Boom, finished");
+      break;
+    }
+    pickSimilar(gob);
+
+    //Put to stockpiles
+    if(PBotUtils.getItemAtHand() != null) {
+      workStockpiles[0].itemClick(0);
+      while(PBotUtils.getItemAtHand() != null)
+        PBotUtils.sleep(25);
+    }
+    PBotUtils.pfRightClick(workStockpiles[0], 0);
+    PBotWindowAPI.waitForWindow("Stockpile", 2000);
+    const slots = PBotWindowAPI.getStockpileTotalCapacity();
+    const used = PBotWindowAPI.getStockpileUsedCapacity();
+    let harvest = PBotUtils.playerInventory().getInventoryItemsByResnames([harvestItemsInventory.getResname()]).size();
+    const count = Math.min(harvest, slots-used);
+    PBotWindowAPI.putItemFromInventoryToStockpile(count);
+    if(count + used === slots)
+      workStockpiles.shift();
+    harvest -= count;
+    while(PBotUtils.playerInventory().getInventoryItemsByResnames([harvestItemsInventory.getResname()]).size() != harvest) {
+      PBotUtils.sleep(25);
+    }
+  }
+}
